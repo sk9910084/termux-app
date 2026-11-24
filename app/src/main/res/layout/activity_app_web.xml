@@ -53,7 +53,7 @@
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="AnyModelBot runs on this phone. First run downloads the server bundle (~91 MB, one time) and installs Node.js if it is missing, then starts the server. The model endpoint is Xkiro (free) — paste your key below."
+                android:text="AnyModelBot runs on this phone. First run downloads the server bundle (~96 MB, one time) and installs Node.js if it is missing, then starts the server. The model endpoint is Xkiro (free) — paste your key below."
                 android:textSize="14sp" />
 
             <com.google.android.material.card.MaterialCardView

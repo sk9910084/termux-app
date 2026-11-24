@@ -52,7 +52,7 @@ public final class EmbeddedApps {
     private static final String BUNDLE_URL =
         "https://github.com/sk9910084/termux-app/releases/download/anymodelbot-bundle-v0.1.47/anymodelbot-bundle-v0.1.47.tgz";
     private static final String BUNDLE_SHA256 =
-        "7cf98d917f2cfd5515f3170b08935b7dfa5e6719d7272f57e7b90347d48930c1";
+        "f61abe3f42da9b96d08a7d1cba22e6202700c35147fbe1e99253443a2831c515";
     private static final String BUNDLE_FILE = "anymodelbot-bundle-v0.1.47.tgz";
 
     private static final String SETUP_SCRIPT_ASSET = "embedded-setup.sh";
@@ -156,7 +156,7 @@ public final class EmbeddedApps {
                 appendLog("Bundle already downloaded and verified.");
             } else {
                 if (bundle.exists()) bundle.delete();
-                appendLog("Downloading AnyModelBot bundle (~91 MB, one time)...");
+                appendLog("Downloading AnyModelBot bundle (~96 MB, one time)...");
                 writeStatus("downloading bundle...");
                 downloadWithProgress(BUNDLE_URL, bundle);
                 String actual = sha256Of(bundle);
