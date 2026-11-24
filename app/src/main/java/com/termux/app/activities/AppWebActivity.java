@@ -1,33 +1,37 @@
 package com.termux.app.activities;
 
-import android.app.AlertDialog;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.text.InputType;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
-import android.widget.EditText;
-import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.tabs.TabLayout;
+import com.google.android.material.textfield.TextInputEditText;
+import com.termux.R;
 import com.termux.app.EmbeddedApps;
 
 /**
- * Web UI for the embedded apps (AnyModelBot, Ovis, web terminal).
+ * Web UI for the embedded apps (AnyModelBot, Terminal, Ovis).
  * The servers run inside Termux on loopback; this activity only displays them.
  *
- * Antigem-shape (v2): while the first-run setup is going, a setup screen shows
- * the download progress, the current step and the live setup log — the servers'
- * tabs only load once their server actually answers, so a tab never shows a
- * bare "connection refused" page. Ovis is not bundled in v2 (it needs
+ * Antigem Dots-style UI: a top app bar (title, back, Stop, Show setup), tabs
+ * for the three servers, and a setup screen with a Keys card (Xkiro key,
+ * endpoint, model) and a Status card (step, download progress, live log).
+ * The WebView fills the screen once its server is running; a tab never shows
+ * a bare "connection refused" page. Ovis is not bundled in v2 (it needs
  * herdr-core); its tab says so.
  */
 public final class AppWebActivity extends AppCompatActivity {
@@ -36,29 +40,44 @@ public final class AppWebActivity extends AppCompatActivity {
     private static final String TERMINAL_URL = "http://127.0.0.1:3602";
 
     private WebView mWebView;
+    private ScrollView mSetupView;
     private TextView mStatusView;
-    private LinearLayout mSetupView;
     private ProgressBar mSetupProgress;
-    private android.widget.ScrollView mSetupLogScroll;
     private TextView mSetupLogView;
+    private TextInputEditText mKeyInput;
+    private TextInputEditText mBaseUrlInput;
+    private TextInputEditText mModelInput;
+    private Button mStartButton;
     private Handler mHandler;
     private Runnable mPollRunnable;
     private String mCurrentTab = "anymodelbot";
     private boolean mAnymodelbotLoaded = false;
     private boolean mTerminalLoaded = false;
     private boolean mOvisLoaded = false;
+    private boolean mShowSetup = false;
+    private boolean mKeysLoaded = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_app_web);
 
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        }
+        toolbar.setNavigationOnClickListener(v -> finish());
+
         mWebView = findViewById(R.id.web_view);
-        mStatusView = findViewById(R.id.text_status);
         mSetupView = findViewById(R.id.setup_view);
+        mStatusView = findViewById(R.id.text_status);
         mSetupProgress = findViewById(R.id.setup_progress);
-        mSetupLogScroll = findViewById(R.id.setup_log_scroll);
         mSetupLogView = findViewById(R.id.text_setup_log);
+        mKeyInput = findViewById(R.id.input_key);
+        mBaseUrlInput = findViewById(R.id.input_base_url);
+        mModelInput = findViewById(R.id.input_model);
+        mStartButton = findViewById(R.id.btn_start_restart);
 
         WebSettings settings = mWebView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -66,15 +85,36 @@ public final class AppWebActivity extends AppCompatActivity {
         settings.setBuiltInZoomControls(false);
         mWebView.setWebViewClient(new WebViewClient());
 
-        Button anymodelbotButton = findViewById(R.id.btn_anymodelbot);
-        Button ovisButton = findViewById(R.id.btn_ovis);
-        Button terminalButton = findViewById(R.id.btn_terminal);
-        Button keyButton = findViewById(R.id.btn_key);
+        TabLayout tabLayout = findViewById(R.id.tab_layout);
+        tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
+            @Override
+            public void onTabSelected(TabLayout.Tab tab) {
+                int pos = tab.getPosition();
+                showTab(pos == 1 ? "terminal" : pos == 2 ? "ovis" : "anymodelbot");
+            }
 
-        anymodelbotButton.setOnClickListener(v -> showTab("anymodelbot"));
-        ovisButton.setOnClickListener(v -> showTab("ovis"));
-        terminalButton.setOnClickListener(v -> showTab("terminal"));
-        keyButton.setOnClickListener(v -> showKeyDialog());
+            @Override
+            public void onTabUnselected(TabLayout.Tab tab) {
+            }
+
+            @Override
+            public void onTabReselected(TabLayout.Tab tab) {
+            }
+        });
+
+        findViewById(R.id.btn_save_keys).setOnClickListener(v -> saveKeys());
+        mStartButton.setOnClickListener(v -> {
+            if (EmbeddedApps.isSetupDone()) {
+                EmbeddedApps.restartServers(this);
+                mAnymodelbotLoaded = false;
+                mTerminalLoaded = false;
+                mShowSetup = false;
+                Toast.makeText(this, "Restarting servers...", Toast.LENGTH_SHORT).show();
+            } else {
+                EmbeddedApps.startSetup(this);
+                Toast.makeText(this, "Starting setup...", Toast.LENGTH_SHORT).show();
+            }
+        });
 
         mHandler = new Handler(Looper.getMainLooper());
         mPollRunnable = new Runnable() {
@@ -86,15 +126,69 @@ public final class AppWebActivity extends AppCompatActivity {
             }
         };
 
+        loadKeysIntoFields();
         showTab("anymodelbot");
     }
 
-    /** One poll tick: setup screen while setup runs, otherwise the current tab. */
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.app_web_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.action_stop) {
+            EmbeddedApps.stopServers(this);
+            mAnymodelbotLoaded = false;
+            mTerminalLoaded = false;
+            mShowSetup = true;
+            Toast.makeText(this, "Servers stopped.", Toast.LENGTH_SHORT).show();
+            return true;
+        }
+        if (id == R.id.action_show_setup) {
+            mShowSetup = true;
+            showSetupView();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    /** Fill the Keys card from the stored files (once, so typing is not clobbered). */
+    private void loadKeysIntoFields() {
+        if (mKeysLoaded) return;
+        mKeysLoaded = true;
+        String key = EmbeddedApps.readKeyFile();
+        if (key != null) mKeyInput.setText(key);
+        mBaseUrlInput.setText(EmbeddedApps.readBaseUrl());
+        mModelInput.setText(EmbeddedApps.readModel());
+    }
+
+    private void saveKeys() {
+        String key = mKeyInput.getText() == null ? "" : mKeyInput.getText().toString().trim();
+        String baseUrl = mBaseUrlInput.getText() == null ? "" : mBaseUrlInput.getText().toString().trim();
+        String model = mModelInput.getText() == null ? "" : mModelInput.getText().toString().trim();
+        boolean ok = EmbeddedApps.writeKeyFile(key)
+            && EmbeddedApps.writeBaseUrl(baseUrl)
+            && EmbeddedApps.writeModel(model);
+        if (ok) {
+            Toast.makeText(this, "Keys saved.", Toast.LENGTH_SHORT).show();
+            if (EmbeddedApps.isSetupDone()) {
+                EmbeddedApps.restartServers(this);
+                mAnymodelbotLoaded = false;
+                mTerminalLoaded = false;
+                mShowSetup = false;
+            }
+        } else {
+            Toast.makeText(this, "Failed to save keys", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** One poll tick: setup screen while setup runs (or is shown), otherwise the tab. */
     private void poll() {
-        if (!EmbeddedApps.isSetupDone()) {
-            mSetupView.setVisibility(View.VISIBLE);
-            mWebView.setVisibility(View.GONE);
-            mStatusView.setVisibility(View.VISIBLE);
+        if (!EmbeddedApps.isSetupDone() || mShowSetup) {
+            showSetupView();
             String status = EmbeddedApps.readStatus();
             mStatusView.setText(status != null ? status : "Setting up...");
             long[] progress = EmbeddedApps.readSetupProgress();
@@ -111,8 +205,9 @@ public final class AppWebActivity extends AppCompatActivity {
             String log = EmbeddedApps.readSetupLogTail();
             if (log != null) {
                 mSetupLogView.setText(log);
-                mSetupLogScroll.post(() -> mSetupLogScroll.fullScroll(View.FOCUS_DOWN));
+                mSetupView.post(() -> mSetupView.fullScroll(View.FOCUS_DOWN));
             }
+            mStartButton.setText(EmbeddedApps.isSetupDone() ? "Restart" : "Start");
             return;
         }
 
@@ -123,109 +218,76 @@ public final class AppWebActivity extends AppCompatActivity {
                 String url = EmbeddedApps.readAnymodelbotUrl();
                 if (url != null) {
                     mAnymodelbotLoaded = true;
-                    mStatusView.setVisibility(View.GONE);
                     mWebView.loadUrl(url);
-                } else {
-                    mStatusView.setVisibility(View.VISIBLE);
-                    String status = EmbeddedApps.readStatus();
-                    mStatusView.setText(status != null ? "AnyModelBot: " + status : "AnyModelBot starting...");
                 }
             }
         } else if ("terminal".equals(mCurrentTab)) {
-            if (!mTerminalLoaded) {
-                if (EmbeddedApps.isTerminalUp()) {
-                    mTerminalLoaded = true;
-                    mStatusView.setVisibility(View.GONE);
-                    mWebView.loadUrl(TERMINAL_URL);
-                } else {
-                    mStatusView.setVisibility(View.VISIBLE);
-                    mStatusView.setText("Terminal: starting...");
-                }
+            if (!mTerminalLoaded && EmbeddedApps.isTerminalUp()) {
+                mTerminalLoaded = true;
+                mWebView.loadUrl(TERMINAL_URL);
             }
         } else if ("ovis".equals(mCurrentTab)) {
-            if (!mOvisLoaded) {
-                if (EmbeddedApps.isOvisUp()) {
-                    mOvisLoaded = true;
-                    mStatusView.setVisibility(View.GONE);
-                    mWebView.loadUrl(OVIS_URL);
-                } else {
-                    mStatusView.setVisibility(View.VISIBLE);
-                    mStatusView.setText("Ovis needs herdr-core — not bundled in this version.");
-                }
+            if (!mOvisLoaded && EmbeddedApps.isOvisUp()) {
+                mOvisLoaded = true;
+                mWebView.loadUrl(OVIS_URL);
             }
         }
+    }
+
+    private void showSetupView() {
+        mSetupView.setVisibility(View.VISIBLE);
+        mWebView.setVisibility(View.GONE);
     }
 
     private void showTab(String tab) {
         mCurrentTab = tab;
-        if (!EmbeddedApps.isSetupDone()) {
-            // Setup screen owns the view until setup finishes; the poll picks up the tab then.
-            mSetupView.setVisibility(View.VISIBLE);
-            mWebView.setVisibility(View.GONE);
-            mStatusView.setVisibility(View.VISIBLE);
-            mStatusView.setText("Setting up...");
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            toolbar.setTitle("terminal".equals(tab) ? "Terminal"
+                : "ovis".equals(tab) ? "Ovis" : "AnyModelBot");
+        }
+        if (!EmbeddedApps.isSetupDone() || mShowSetup) {
+            showSetupView();
             mWebView.loadUrl("about:blank");
             return;
         }
+        mSetupView.setVisibility(View.GONE);
+        mWebView.setVisibility(View.VISIBLE);
         if ("anymodelbot".equals(tab)) {
             String url = EmbeddedApps.readAnymodelbotUrl();
             if (url != null) {
                 mAnymodelbotLoaded = true;
-                mStatusView.setVisibility(View.GONE);
                 mWebView.loadUrl(url);
             } else {
-                mStatusView.setVisibility(View.VISIBLE);
                 String status = EmbeddedApps.readStatus();
-                mStatusView.setText(status != null ? "AnyModelBot: " + status : "AnyModelBot starting...");
-                mWebView.loadUrl("about:blank");
+                loadMessagePage("AnyModelBot is starting...",
+                    status != null ? status : "The server is starting. This takes a minute on first run.");
             }
         } else if ("terminal".equals(tab)) {
             if (EmbeddedApps.isTerminalUp()) {
                 mTerminalLoaded = true;
-                mStatusView.setVisibility(View.GONE);
                 mWebView.loadUrl(TERMINAL_URL);
             } else {
-                mStatusView.setVisibility(View.VISIBLE);
-                mStatusView.setText("Terminal: starting...");
-                mWebView.loadUrl("about:blank");
+                loadMessagePage("Terminal is starting...", "The terminal bridge starts after setup finishes.");
             }
         } else if ("ovis".equals(tab)) {
             if (EmbeddedApps.isOvisUp()) {
                 mOvisLoaded = true;
-                mStatusView.setVisibility(View.GONE);
                 mWebView.loadUrl(OVIS_URL);
             } else {
-                mStatusView.setVisibility(View.VISIBLE);
-                mStatusView.setText("Ovis needs herdr-core — not bundled in this version.");
-                mWebView.loadUrl("about:blank");
+                loadMessagePage("Ovis is not available yet.",
+                    "The Ovis server needs herdr-core, which is not bundled in this version.");
             }
         }
     }
 
-    private void showKeyDialog() {
-        EditText input = new EditText(this);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        input.setHint("Xkiro API key");
-        String existingKey = EmbeddedApps.readKeyFile();
-        if (existingKey != null) input.setText(existingKey);
-        new AlertDialog.Builder(this)
-            .setTitle("Model API key")
-            .setMessage("Xkiro API key for AnyModelBot (free models). Stored only on this phone, never sent anywhere else.")
-            .setView(input)
-            .setPositiveButton("Save", (dialog, which) -> {
-                String key = input.getText().toString().trim();
-                if (EmbeddedApps.writeKeyFile(key)) {
-                    Toast.makeText(this, "Key saved, restarting servers...", Toast.LENGTH_LONG).show();
-                    EmbeddedApps.restartServers(this);
-                    mAnymodelbotLoaded = false;
-                    mTerminalLoaded = false;
-                    showTab("anymodelbot");
-                } else {
-                    Toast.makeText(this, "Failed to save key", Toast.LENGTH_LONG).show();
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .show();
+    /** Small dark message page in the WebView area (never a raw browser error page). */
+    private void loadMessagePage(String title, String body) {
+        String html = "<html><head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+            + "<style>body{background:#121212;color:#e0e0e0;font-family:sans-serif;padding:32px 16px}"
+            + "h2{font-size:18px}p{font-size:14px;color:#9e9e9e}</style></head><body>"
+            + "<h2>" + title + "</h2><p>" + body + "</p></body></html>";
+        mWebView.loadData(html, "text/html", "UTF-8");
     }
 
     @Override
@@ -242,7 +304,12 @@ public final class AppWebActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        if (mWebView.canGoBack()) {
+        if (mSetupView.getVisibility() == View.VISIBLE && EmbeddedApps.isSetupDone()) {
+            mShowSetup = false;
+            showTab(mCurrentTab);
+            return;
+        }
+        if (mWebView.getVisibility() == View.VISIBLE && mWebView.canGoBack()) {
             mWebView.goBack();
         } else {
             super.onBackPressed();
