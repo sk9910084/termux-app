@@ -86,18 +86,19 @@ set_status "setting up terminal..."
 ls -la "$BASE/terminal/" || true
 
 # ---------- Env + start script ----------
-cat > "$BASE/env.sh" <<'EOF'
-export AMB_LANG=en
-export AMB_ALLOW_LANDLOCK=1
-export AMB_MAGPIE_BASE_URL=https://api.xkiro.com/v1
-export AMB_DEFAULT_MODEL=mistralai/mistral-small-2603
-EOF
+# The start script reads the key / endpoint / model files each time it runs
+# (with the Xkiro defaults), so a key saved in the app applies on restart.
 cat > "$BASE/start-servers.sh" <<'EOS'
 #!/data/data/com.termux/files/usr/bin/bash
 # Starts AnyModelBot + terminal bridge. Idempotent, restart-capable.
 BASE="$HOME/.anymodelbot"
 [ -f "$BASE/env-path.sh" ] && . "$BASE/env-path.sh"
-[ -f "$BASE/env.sh" ] && . "$BASE/env.sh"
+export AMB_LANG=en
+export AMB_ALLOW_LANDLOCK=1
+export AMB_MAGPIE_BASE_URL="$(cat "$BASE/xkiro-base-url.txt" 2>/dev/null | tr -d ' \n\r')"
+[ -z "$AMB_MAGPIE_BASE_URL" ] && AMB_MAGPIE_BASE_URL="https://api.xkiro.com/v1"
+export AMB_DEFAULT_MODEL="$(cat "$BASE/xkiro-model.txt" 2>/dev/null | tr -d ' \n\r')"
+[ -z "$AMB_DEFAULT_MODEL" ] && AMB_DEFAULT_MODEL="mistralai/mistral-small-2603"
 if [ -f "$BASE/xkiro-key.txt" ]; then export AMB_MAGPIE_API_KEY="$(cat "$BASE/xkiro-key.txt" | tr -d ' \n\r')"; fi
 # Stop previous instances (pid files + pattern match, node may orphan children)
 for p in anymodelbot terminal; do

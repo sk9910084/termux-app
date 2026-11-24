@@ -1,93 +1,195 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Antigem Dots-style screen: top app bar, tabs, a setup screen with a Keys
+     card and a Status card (progress + log), and the server WebView when running. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <LinearLayout
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:background="?attr/colorSurface"
+        app:title="AnyModelBot" />
 
-        <Button
-            android:id="@+id/btn_anymodelbot"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:maxLines="1"
-            android:text="BOT"
-            android:textSize="13sp" />
-
-        <Button
-            android:id="@+id/btn_ovis"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:maxLines="1"
-            android:text="OVIS"
-            android:textSize="13sp" />
-
-        <Button
-            android:id="@+id/btn_terminal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:maxLines="1"
-            android:text="TERM"
-            android:textSize="13sp" />
-
-        <Button
-            android:id="@+id/btn_key"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:maxLines="1"
-            android:text="KEY"
-            android:textSize="13sp" />
-
-    </LinearLayout>
-
-    <TextView
-        android:id="@+id/text_status"
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tab_layout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
-        android:padding="16dp"
-        android:text="AnyModelBot starting..." />
+        app:tabMode="fixed">
 
-    <LinearLayout
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Bot" />
+
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Terminal" />
+
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Ovis" />
+
+    </com.google.android.material.tabs.TabLayout>
+
+    <ScrollView
         android:id="@+id/setup_view"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:orientation="vertical"
         android:visibility="gone">
 
-        <ProgressBar
-            android:id="@+id/setup_progress"
-            style="?android:attr/progressBarStyleHorizontal"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:max="100"
-            android:visibility="gone" />
-
-        <ScrollView
-            android:id="@+id/setup_log_scroll"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1">
+            android:orientation="vertical"
+            android:padding="16dp">
 
             <TextView
-                android:id="@+id/text_setup_log"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:padding="8dp"
-                android:textSize="12sp"
-                android:typeface="monospace" />
+                android:text="AnyModelBot runs on this phone. First run downloads the server bundle (~91 MB, one time) and installs Node.js if it is missing, then starts the server. The model endpoint is Xkiro (free) — paste your key below."
+                android:textSize="14sp" />
 
-        </ScrollView>
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
 
-    </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Keys"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:hint="Xkiro API key"
+                        app:endIconMode="password_toggle">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/input_key"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textPassword" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Free key from xkiro.com. Stored only on this phone, never sent anywhere else."
+                        android:textAppearance="?attr/textAppearanceBodySmall" />
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:hint="Model endpoint">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/input_base_url"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="textUri" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:hint="Model">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/input_model"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="text" />
+
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_save_keys"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="Save keys" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:id="@+id/text_status"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Setting up..."
+                        android:textAppearance="?attr/textAppearanceBodyMedium" />
+
+                    <ProgressBar
+                        android:id="@+id/setup_progress"
+                        style="?android:attr/progressBarStyleHorizontal"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:max="100"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/text_setup_log"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:typeface="monospace" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_start_restart"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:text="Start" />
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Note: Ovis needs herdr-core, which is not bundled yet, and the DSH agent runtime is not included — AnyModelBot chats with your model through the endpoint above."
+                android:textAppearance="?attr/textAppearanceBodySmall" />
+
+        </LinearLayout>
+
+    </ScrollView>
 
     <WebView
         android:id="@+id/web_view"

@@ -57,9 +57,11 @@ public final class EmbeddedApps {
 
     private static final String SETUP_SCRIPT_ASSET = "embedded-setup.sh";
     private static final String BRIDGE_ASSET = "terminal-bridge.js";
+    private static final String STOP_SCRIPT_ASSET = "stop-servers.sh";
 
     private static final String SETUP_SCRIPT_PATH = EMBEDDED_DIR_PATH + "/embedded-setup.sh";
     private static final String START_SCRIPT_PATH = EMBEDDED_DIR_PATH + "/start-servers.sh";
+    private static final String STOP_SCRIPT_PATH = EMBEDDED_DIR_PATH + "/stop-servers.sh";
     private static final String BRIDGE_PATH = EMBEDDED_DIR_PATH + "/terminal/bridge.js";
     private static final String SETUP_DONE_MARKER = EMBEDDED_DIR_PATH + "/setup-done";
     private static final String SETUP_LOG = EMBEDDED_DIR_PATH + "/setup.log";
@@ -69,9 +71,17 @@ public final class EmbeddedApps {
     private static final String TERMINAL_UP_FILE = EMBEDDED_DIR_PATH + "/terminal-up";
     private static final String OVIS_UP_FILE = EMBEDDED_DIR_PATH + "/ovis-up";
     private static final String XIRO_KEY_FILE = EMBEDDED_DIR_PATH + "/xkiro-key.txt";
+    private static final String XIRO_BASE_URL_FILE = EMBEDDED_DIR_PATH + "/xkiro-base-url.txt";
+    private static final String XIRO_MODEL_FILE = EMBEDDED_DIR_PATH + "/xkiro-model.txt";
+
+    /** Default model endpoint + model (Xkiro free), used when no file is stored yet. */
+    public static final String DEFAULT_BASE_URL = "https://api.xkiro.com/v1";
+    public static final String DEFAULT_MODEL = "mistralai/mistral-small-2603";
 
     /** Open the web UI at most once per app process launch. */
     private static boolean sWebViewOpened = false;
+    /** True while a bundle download / setup run is in flight (do not start a second one). */
+    private static boolean sSetupRunning = false;
 
     private EmbeddedApps() {}
 
@@ -81,6 +91,7 @@ public final class EmbeddedApps {
             new File(EMBEDDED_DIR_PATH).mkdirs();
             new File(EMBEDDED_DIR_PATH + "/terminal").mkdirs();
             copyAsset(activity, SETUP_SCRIPT_ASSET, new File(SETUP_SCRIPT_PATH), true);
+            copyAsset(activity, STOP_SCRIPT_ASSET, new File(STOP_SCRIPT_PATH), true);
             copyAsset(activity, BRIDGE_ASSET, new File(BRIDGE_PATH), false);
             copyAsset(activity, "terminal/jquery.min.js",
                 new File(EMBEDDED_DIR_PATH + "/terminal/jquery.min.js"), false);
@@ -98,7 +109,7 @@ public final class EmbeddedApps {
             runBackgroundScript(activity, START_SCRIPT_PATH);
         } else {
             Logger.logInfo(LOG_TAG, "First run, downloading bundle then running setup");
-            new Thread(() -> downloadBundleThenSetup(activity.getApplicationContext())).start();
+            startSetup(activity.getApplicationContext());
         }
 
         if (!sWebViewOpened) {
@@ -111,6 +122,30 @@ public final class EmbeddedApps {
                 }
             }, 800);
         }
+    }
+
+    /** Start (or restart) the first-run setup: download the bundle, then run setup. */
+    public static synchronized void startSetup(Context context) {
+        if (sSetupRunning) {
+            Logger.logInfo(LOG_TAG, "Setup already running, ignoring second start");
+            return;
+        }
+        sSetupRunning = true;
+        Context appContext = context.getApplicationContext();
+        new Thread(() -> {
+            try {
+                downloadBundleThenSetup(appContext);
+            } finally {
+                synchronized (EmbeddedApps.class) {
+                    sSetupRunning = false;
+                }
+            }
+        }).start();
+    }
+
+    /** Stop the servers (used by the toolbar Stop action). */
+    public static void stopServers(Context context) {
+        runBackgroundScript(context, STOP_SCRIPT_PATH);
     }
 
     /** Download the prebuilt bundle (with progress + SHA-256 check), then run setup. */
@@ -287,6 +322,38 @@ public final class EmbeddedApps {
 
     public static String readKeyFile() {
         return readSmallFile(new File(XIRO_KEY_FILE));
+    }
+
+    /** Stored model endpoint, or the default when nothing is stored yet. */
+    public static String readBaseUrl() {
+        String value = readSmallFile(new File(XIRO_BASE_URL_FILE));
+        return value != null ? value : DEFAULT_BASE_URL;
+    }
+
+    /** Stored model, or the default when nothing is stored yet. */
+    public static String readModel() {
+        String value = readSmallFile(new File(XIRO_MODEL_FILE));
+        return value != null ? value : DEFAULT_MODEL;
+    }
+
+    private static boolean writeTextFile(File file, String value) {
+        try (FileOutputStream out = new FileOutputStream(file)) {
+            out.write(value.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception e) {
+            return false;
+        }
+        file.setReadable(true, true);
+        file.setWritable(true, true);
+        file.setExecutable(false, false);
+        return true;
+    }
+
+    public static boolean writeBaseUrl(String baseUrl) {
+        return writeTextFile(new File(XIRO_BASE_URL_FILE), baseUrl);
+    }
+
+    public static boolean writeModel(String model) {
+        return writeTextFile(new File(XIRO_MODEL_FILE), model);
     }
 
     public static boolean writeKeyFile(String key) {
