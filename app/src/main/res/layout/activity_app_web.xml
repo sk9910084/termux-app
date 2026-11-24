@@ -14,28 +14,36 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="AnyModelBot" />
+            android:maxLines="1"
+            android:text="BOT"
+            android:textSize="13sp" />
 
         <Button
             android:id="@+id/btn_ovis"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Ovis" />
+            android:maxLines="1"
+            android:text="OVIS"
+            android:textSize="13sp" />
 
         <Button
             android:id="@+id/btn_terminal"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Terminal" />
+            android:maxLines="1"
+            android:text="TERM"
+            android:textSize="13sp" />
 
         <Button
             android:id="@+id/btn_key"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Key" />
+            android:maxLines="1"
+            android:text="KEY"
+            android:textSize="13sp" />
 
     </LinearLayout>
 
@@ -46,6 +54,40 @@
         android:gravity="center"
         android:padding="16dp"
         android:text="AnyModelBot starting..." />
+
+    <LinearLayout
+        android:id="@+id/setup_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <ProgressBar
+            android:id="@+id/setup_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:max="100"
+            android:visibility="gone" />
+
+        <ScrollView
+            android:id="@+id/setup_log_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <TextView
+                android:id="@+id/text_setup_log"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:textSize="12sp"
+                android:typeface="monospace" />
+
+        </ScrollView>
+
+    </LinearLayout>
 
     <WebView
         android:id="@+id/web_view"

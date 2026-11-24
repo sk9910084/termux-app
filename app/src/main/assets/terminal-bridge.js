@@ -8,7 +8,9 @@ const { spawn } = require('child_process');
 
 const PORT = 3602;
 const HOST = '127.0.0.1';
-const ROOT = path.join(__dirname, 'node_modules');
+// v2: the static files ship in the APK assets and are copied next to this
+// script by the app — no npm install on the phone.
+const ROOT = __dirname;
 
 function resolveStatic(rel) {
   const p = path.join(ROOT, rel);
@@ -16,9 +18,9 @@ function resolveStatic(rel) {
 }
 
 const FILES = {
-  '/jquery.min.js': resolveStatic('jquery/dist/jquery.min.js'),
-  '/jquery.terminal.min.js': resolveStatic('jquery.terminal/js/jquery.terminal.min.js'),
-  '/jquery.terminal.min.css': resolveStatic('jquery.terminal/css/jquery.terminal.min.css'),
+  '/jquery.min.js': resolveStatic('jquery.min.js'),
+  '/jquery.terminal.min.js': resolveStatic('jquery.terminal.min.js'),
+  '/jquery.terminal.min.css': resolveStatic('jquery.terminal.min.css'),
 };
 
 const PAGE = `<!doctype html>
