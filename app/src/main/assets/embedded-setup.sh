@@ -12,7 +12,7 @@ LOG="$BASE/setup.log"
 STATUS="$BASE/status.txt"
 MARKER="$BASE/setup-done"
 BUNDLE="$BASE/anymodelbot-bundle-v0.1.47.tgz"
-BUNDLE_SHA256="7cf98d917f2cfd5515f3170b08935b7dfa5e6719d7272f57e7b90347d48930c1"
+BUNDLE_SHA256="f61abe3f42da9b96d08a7d1cba22e6202700c35147fbe1e99253443a2831c515"
 mkdir -p "$BASE" "$BASE/terminal"
 exec >>"$LOG" 2>&1
 echo "=== embedded setup v2 $(date) ==="
@@ -20,6 +20,14 @@ set_status() { echo "$1" > "$STATUS"; echo "STATUS: $1"; }
 set_status "setup running"
 
 # ---------- Node.js >= 22 ----------
+# Termux's own node is the only one that runs here: the official Node
+# tarball is built against glibc and cannot run on Termux (Bionic).
+# On a fresh Termux the node package can be newer than its C++ library
+# (node fails with "cannot locate symbol _ZNSt6__ndk113..."), so the fix
+# is to bring the libraries up to date, not to fetch another node.
+# Also remove any stale env-path.sh from the old tarball fallback.
+rm -f "$BASE/env-path.sh"
+rm -rf "$BASE"/node-v22*-linux-arm64
 node_ok() {
   command -v node >/dev/null 2>&1 || return 1
   major=$(node --version 2>/dev/null | sed 's/^v//; s/\..*//')
@@ -30,19 +38,17 @@ if ! node_ok; then
   pkg update -y && pkg install -y nodejs git || echo "pkg install had errors, checking node anyway"
 fi
 if ! node_ok; then
-  echo "pkg node missing/too old, trying official Node 22 tarball..."
-  arch=$(uname -m)
-  case "$arch" in
-    aarch64) node_arch=arm64 ;;
-    *) echo "Unsupported arch for tarball: $arch"; set_status "error: unsupported arch $arch"; exit 1 ;;
-  esac
-  ver=$(curl -fsSL https://nodejs.org/dist/index.json 2>/dev/null | grep -o '"version":"v22[^"]*"' | head -1 | sed 's/"version":"//; s/"//')
-  if [ -z "$ver" ]; then echo "Could not resolve Node 22 version"; set_status "error: node resolve failed"; exit 1; fi
-  cd "$BASE" || exit 1
-  curl -fsSL -o "node-$ver-linux-$node_arch.tar.xz" "https://nodejs.org/dist/$ver/node-$ver-linux-$node_arch.tar.xz" || { set_status "error: node download failed"; exit 1; }
-  tar -xf "node-$ver-linux-$node_arch.tar.xz" || { set_status "error: node extract failed"; exit 1; }
-  echo "export PATH=\"$BASE/node-$ver-linux-$node_arch/bin:\$PATH\"" > "$BASE/env-path.sh"
-  echo "Node from tarball: $ver"
+  echo "Node still broken (usually an old C++ library) — updating libc++..."
+  pkg install -y libc++ || echo "libc++ install had errors, checking node anyway"
+fi
+if ! node_ok; then
+  echo "Node still broken — upgrading all Termux packages..."
+  pkg upgrade -y || echo "pkg upgrade had errors, checking node anyway"
+fi
+if ! node_ok; then
+  echo "ERROR: node does not run. Run 'pkg upgrade' in the Termux terminal and try again."
+  set_status "error: node is broken (pkg upgrade needed)"
+  exit 1
 fi
 node --version
 npm --version
